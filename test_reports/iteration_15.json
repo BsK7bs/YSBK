@@ -1,0 +1,40 @@
+{
+  "summary": "Completed comprehensive backend testing for Digital Twin Agent Installer Bundle Layout v2 (payload/ subfolder structure and ACL-reset fixes). All 7 test categories passed with 100% success rate.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "POST /api/agent/installer/download-init returns correct response (download_token, pairing_code DT-XXXX-XXXX, filename.zip, is_bundle=true, expires_in=300)",
+    "GET /api/agent/installer/download returns HTTP 200 with Content-Type application/zip, Content-Length exact match (220,208,898 bytes), ZIP integrity verified",
+    "ZIP root contains exactly 3 files (install.cmd, README.txt, bundle.json) with NO .exe files at root",
+    "payload/ subfolder contains exactly 3 files (DigitalTwinAgentSetup_<code>.exe, agent.exe, uninstaller.exe)",
+    "Total ZIP entry count is 6 (3 root + 3 payload)",
+    "bundle.json schema correct (schema_version=2, layout='payload-subfolder', installer/agent/uninstaller paths point to payload/, entrypoint='install.cmd', pairing_code matches)",
+    "install.cmd INSTALLER variable points to payload/ subfolder",
+    "install.cmd uses pushd/popd to change into payload/ before running installer",
+    "install.cmd contains ACL-reset block with all 5 commands (takeown, icacls /reset, icacls /grant, attrib, rmdir) inside 'if exist %INSTALL_ROOT%' guard",
+    "install.cmd contains earlier fixes (setlocal EnableExtensions EnableDelayedExpansion, net session probe, VBScript UAC elevation via Shell.Application + runas, sc query/stop DigitalTwinAgent, taskkill for agent.exe/uninstaller.exe/DigitalTwinAgent.exe)",
+    "README.txt contains asterisk-boxed warning banner instructing users to only double-click install.cmd and NOT run anything inside payload/ directly",
+    "README.txt references 'payload\\' in the 'How to install' file listing",
+    "Pairing code embedded in ZIP filename is recognized by /api/agent/installer/verify?code=<code> endpoint"
+  ],
+  "test_report_links": [
+    "/app/backend_test.py"
+  ],
+  "action_item_for_main_agent": "",
+  "updated_files": [
+    "/app/backend_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (7/7 tests passed)",
+    "frontend": "N/A (backend-only testing as requested)"
+  },
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

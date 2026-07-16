@@ -1,0 +1,51 @@
+{
+  "summary": "Completed comprehensive backend testing for Windows Installer fsutil + retry-loop + write-test fixes (2026-07-16 iteration 2). All 23 tests passed with 100% success rate. Verified all NEW defensive measures: fsutil elevation probe (replacing net session), sc delete command, PythonService.exe in taskkill, 8-attempt retry loop with 2s delays, final guard with exit code 32, and write-test with exit code 5.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Regression: POST /api/agent/installer/download-init returns correct response (download_token, pairing_code DT-XXXX-XXXX, filename.zip, is_bundle=true, expires_in=300)",
+    "Regression: GET /api/agent/installer/download returns HTTP 200 with Content-Type application/zip, Content-Length exact match, ZIP integrity verified",
+    "Regression: ZIP layout correct (install.cmd/README.txt/bundle.json at root, 3 EXEs under payload/)",
+    "Regression: Pairing code in filename matches /api/agent/installer/verify endpoint",
+    "NEW: install.cmd uses 'fsutil dirty query %SYSTEMDRIVE%' as elevation probe (NOT 'net session')",
+    "NEW: install.cmd does NOT contain 'net session' anymore (replaced by fsutil)",
+    "NEW: install.cmd runs 'sc delete DigitalTwinAgent' inside the service-cleanup block",
+    "NEW: 'sc delete DigitalTwinAgent' comes AFTER 'sc stop DigitalTwinAgent' in correct order",
+    "NEW: 'sc delete' is inside the 'if %errorlevel% equ 0' block after 'sc query DigitalTwinAgent'",
+    "NEW: install.cmd includes PythonService.exe in taskkill targets (in addition to agent.exe/uninstaller.exe/DigitalTwinAgent.exe)",
+    "NEW: install.cmd has retry loop 'for /L %%i in (1,1,8)' for deleting agent.exe",
+    "NEW: Retry loop attempts 'del /F /Q %INSTALL_ROOT%\\agent.exe'",
+    "NEW: Retry loop includes 'timeout /t 2 /nobreak' between attempts (8 x 2s = 16s total)",
+    "NEW: Retry loop is inside the 'if exist %INSTALL_ROOT%' cleanup block",
+    "NEW: install.cmd has final guard 'if exist %INSTALL_ROOT%\\agent.exe' after retry loop",
+    "NEW: Final guard prints 'please REBOOT' message",
+    "NEW: Final guard exits with code 32",
+    "NEW: install.cmd has WRITE-TEST section that creates sentinel file .dt_writetest_%RANDOM%.tmp",
+    "NEW: WRITE-TEST section comes BEFORE 'pushd payload' (pre-flight check)",
+    "NEW: WRITE-TEST creates %INSTALL_ROOT% if missing",
+    "NEW: WRITE-TEST grants Administrators (S-1-5-32-544) full control before testing",
+    "NEW: WRITE-TEST has actionable diagnostic mentioning Controlled Folder Access / Group Policy / AppLocker",
+    "NEW: WRITE-TEST exits with code 5 if write fails"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_installer_fsutil_fix.py",
+    "/tmp/test_output.log"
+  ],
+  "action_item_for_main_agent": "",
+  "updated_files": [
+    "/app/backend/tests/test_installer_fsutil_fix.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (23/23 tests passed)",
+    "frontend": "N/A (backend-only testing as requested)"
+  },
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

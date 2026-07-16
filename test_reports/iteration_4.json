@@ -1,0 +1,54 @@
+{
+  "summary": "Completed comprehensive backend-only testing for endpoint-management features. All 61 tests passed successfully (100% success rate). Tested: Bulk Actions with batch tracking and per-device status, Device Groups CRUD with assignment operations, Maintenance Mode with alert suppression and bulk action skipping, Agent Installer endpoints (PowerShell/batch/ZIP), Enhanced Enrollment QR flow with deep-link and one-liners, Action retry functionality, and RBAC enforcement for destructive actions.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Admin login with admin@digitaltwin.com / ChangeMe!2026",
+    "GET /api/actions/kinds returns 19 action kinds with admin_only and requires_confirm sets",
+    "POST /api/actions/bulk creates batch with per-device actions",
+    "Bulk destructive action without confirm=true returns 400",
+    "GET /api/actions/batches lists batches with status_counts (pending, in_progress, succeeded, failed, cancelled, expired, total)",
+    "GET /api/actions/batches/{id} returns batch detail with actions array and device_hostname",
+    "POST /api/actions/{id}/retry rejects retry of active action (400)",
+    "POST /api/device-groups creates group (admin only) with device_count=0",
+    "GET /api/device-groups lists groups with device_count field",
+    "PATCH /api/device-groups/{id} updates group",
+    "POST /api/device-groups/{id}/assign adds devices to group",
+    "GET /api/device-groups/{id}/devices returns devices in group",
+    "POST /api/device-groups/{id}/unassign removes devices from group",
+    "DELETE /api/device-groups/{id} removes group and unassigns from all devices",
+    "Bulk action with group_ids resolves devices from group",
+    "POST /api/devices/{id}/maintenance/enable sets maintenance mode with ends_at and suppress_alerts",
+    "GET /api/devices/{id}/maintenance returns maintenance state",
+    "Bulk destructive action skips devices in maintenance mode (returns skipped list)",
+    "POST /api/devices/{id}/maintenance/disable clears maintenance mode",
+    "GET /api/installer/install.ps1 returns text/plain PowerShell script",
+    "PowerShell script with backend_url and code query params prepends $env: lines",
+    "GET /api/installer/install.bat returns text/plain batch wrapper",
+    "GET /api/installer/agent-bundle.zip returns application/zip with valid PK magic bytes",
+    "GET /api/installer/installer.info returns version + supported flags (requires auth)",
+    "GET /api/installer/enroll-link?code=XXX returns deep_link, one_liner_ps, one_liner_bat with correct formats",
+    "Technician gets 403 when trying to enqueue destructive bulk action (RBAC enforcement)",
+    "All diagnostic action kinds present: restart_agent, collect_event_logs, collect_diagnostic, collect_crash_dumps"
+  ],
+  "test_report_links": [
+    "/app/backend/endpoint_management_test.py"
+  ],
+  "action_item_for_main_agent": "",
+  "updated_files": [
+    "/app/backend/endpoint_management_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (61/61 tests passed)",
+    "frontend": "N/A (backend-only testing as requested)"
+  },
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

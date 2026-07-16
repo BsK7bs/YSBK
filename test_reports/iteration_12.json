@@ -1,0 +1,58 @@
+{
+  "summary": "End-to-end verification of Windows Agent Installer v3 (PyInstaller EXE flow). Backend: 22 pytest tests covering /info, /download, /verify happy-path and error paths, auth requirements, RBAC (viewer 403 / admin 200), enrollment_codes Mongo persistence, and legacy endpoint removal — all 22 passed. Frontend: verified dashboard-enroll-button opens download-agent-dialog, unavailable card shows 'Installer not built yet' + installer-refresh-btn when /app/dist is empty, ready state shows agent-label-input + download-agent-btn when stub EXE is present, clicking Download Agent triggers a browser download whose filename matches DigitalTwinAgentSetup_DT-XXXX-XXXX.exe, and dialog transitions to the Waiting-for-device checklist showing the same pairing code. devices-enroll-button also opens the same dialog. /app/dist left empty at the end per agent-to-agent instructions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "GET /api/agent/installer/info anonymous -> 401/403",
+    "GET /api/agent/installer/info (no EXE) -> 200 available=false + reason",
+    "GET /api/agent/installer/info (stub EXE) -> 200 available=true + size + sha256 + updated_at + version",
+    "GET /api/agent/installer/download anonymous -> 401/403",
+    "GET /api/agent/installer/download (no EXE) -> 503 with operator-friendly detail",
+    "GET /api/agent/installer/download (stub EXE, admin) -> 200 streams bytes, X-Pairing-Code header set, Content-Disposition filename=DigitalTwinAgentSetup_DT-XXXX-XXXX.exe, enrollment_codes doc created (org-scoped, used=false, issued_via=agent_installer_download, label persisted, expires_at set)",
+    "GET /api/agent/installer/download (viewer) -> 403 (require_role('technician') blocks viewer)",
+    "GET /api/agent/installer/download (owner/admin) -> 200",
+    "GET /api/agent/installer/verify anonymous -> 401/403",
+    "GET /api/agent/installer/verify?code=malformed -> 400",
+    "GET /api/agent/installer/verify?code=DT-ZZZZ-9999 (unknown) -> 404",
+    "GET /api/agent/installer/verify?code=<freshly-minted> -> 200 paired=false, device=null, expires_at present",
+    "Legacy endpoints (/agent/installer/bundle, /agent/installer/requirements.txt, /installers/tokens, /installers/config, /installers/download, /installers/sidecar, /installers/info, /installer/download) all return 404",
+    "Backend health/root endpoints return 200",
+    "Frontend: dashboard-enroll-button labeled 'Download Agent' opens download-agent-dialog",
+    "Frontend: unavailable card shows 'Installer not built yet' + installer-refresh-btn when EXE missing",
+    "Frontend: ready state shows agent-label-input + download-agent-btn when stub EXE present",
+    "Frontend: clicking download-agent-btn triggers browser download with filename DigitalTwinAgentSetup_DT-XXXX-XXXX.exe",
+    "Frontend: post-download dialog transitions to Waiting state — shows filename, pairing code, 3-step checklist (Download complete, Double-click installer, Waiting for the device to come online), agent-download-done-btn present, verify endpoint polled every 5s",
+    "Frontend: devices-enroll-button opens the same download-agent-dialog"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_agent_installer.py",
+    "/app/test_reports/pytest/agent_installer_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/.env JWT_SECRET (or equivalent HMAC key) appears to be <32 bytes — jwt library logs InsecureKeyLengthWarning on every token op (visible in supervisor logs). Not blocking, but consider rotating to a 32+ byte key for RFC 7518 §3.2 compliance.",
+    "agent_installer.py::_sha256 recomputes the SHA-256 of the EXE on every /info call — cheap for a 1KB stub but real installers will be ~40MB. Consider caching by (mtime, size) to avoid re-hashing on every dashboard render.",
+    "Dashboard WebSocket wss://.../api/ws/dashboard?token=... closed before connection established (repeatedly logged). Not related to installer flow but worth surfacing — could indicate proxy/ingress WS handshake issue.",
+    "EnrollDeviceDialog.jsx: download error path uses toast for feedback but the dialog stays in the ready state — a user who receives 503 sees a toast that dismisses in ~4s. Consider surfacing 503 detail inline (e.g., re-fetch /info and show unavailable card) so operators aren't left staring at a stale ready state."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_agent_installer.py"
+  ],
+  "success_rate": {
+    "backend": "100% (22/22)",
+    "frontend": "100% (all critical selectors + flows verified)"
+  },
+  "test_credentials": "admin@digitaltwin.com / ChangeMe!2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Ephemeral: (a) placed 2KB stub at /app/dist/DigitalTwinAgentSetup.exe during ready-state tests, removed at teardown so /app/dist is empty at end. (b) inserted a temporary viewer user in Mongo (email prefix test_viewer_*) for RBAC test, deleted at teardown. (c) enrollment_codes rows minted during /download tests are cleaned up in each test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live at /app/backend/tests/test_agent_installer.py — run with `python -m pytest backend/tests/test_agent_installer.py -n 0 -v` (the -n 0 disables xdist parallelism because tests mutate the shared /app/dist/DigitalTwinAgentSetup.exe file). Stub EXE fixture writes ~2KB of random bytes prefixed with 'MZ'. Login response body itself carries user.org_id and user.email — no /auth/me call needed (there is no viewer-creation POST endpoint, so the viewer_user fixture inserts directly into Mongo with a bcrypt password_hash). Frontend uses /app/dashboard and /app/devices as authenticated routes; the enroll button label is 'Download Agent' now, not 'Enroll device'.",
+  "rca of the issue": "N/A — no regressions or bugs found in this iteration."
+}

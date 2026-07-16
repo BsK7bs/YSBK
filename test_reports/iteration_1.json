@@ -1,0 +1,45 @@
+{
+  "summary": "First-finish smoke of Digital Twin Platform after zip import. Auth, tenant isolation, enrollment, notification channels config (with SMTP password masking), software policy (mode change + rules + bulk + inventory + compliance), health engine, RBAC, and frontend pages all pass end-to-end. Alert engine runtime dwell/dedup/ack/close was NOT executed at runtime because it requires a WebSocket agent simulation; endpoints exist and rules config returns correct dwell thresholds. Frontend loads, login works, KPI dashboard renders, WebSocket dashboard shows Live: connected, and all key routes (Devices, Alerts, Software) render correctly.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "POST /api/auth/login with admin@digitaltwin.com/ChangeMe!2026 returns access+refresh tokens",
+    "POST /api/auth/refresh returns new access token",
+    "POST /api/enrollment/codes creates a code; POST /api/enrollment/enroll returns device_id + device_api_key",
+    "GET /api/devices returns the enrolled device for the admin org",
+    "Tenant isolation: signed up org2 via POST /api/auth/signup (organization_name field); GET /api/devices returns [] for org2",
+    "GET /api/alerts/channels/config default {email.enabled:false, slack.enabled:false, min_severity:'high'}",
+    "PUT /api/alerts/channels/config accepts email creds and MASKS smtp_password as '***' on re-GET",
+    "GET /api/software/policy defaults to mode='monitor'",
+    "PUT /api/software/policy to 'blocklist' works, records updated_by admin email (audit)",
+    "POST /api/software/rules (schema: mode+name+match_type) creates block rule",
+    "POST /api/software/rules/bulk with {mode, entries[]} imports rules ({ok:true,count:2})",
+    "GET /api/software/inventory and /api/software/compliance return valid payloads",
+    "GET /api/devices/{id}/health returns engine_version=v1-rule-based with score/tier/trend/failure_risk_percent/confidence_percent/data_completeness_percent/breakdown",
+    "GET /api/devices/{id}/health/timeline?range=24h returns items[]",
+    "RBAC: viewer role invited via /api/invitations and accepted; viewer PUT /api/software/policy returns 403 'Requires role >= admin'",
+    "GET /api/alert-rules returns resolution_grace_by_severity {info:0, low:300, medium:600, high:null, critical:null} matching design (high/critical require manual ack)",
+    "Alert rule cpu.high escalations: 85%/600s=medium, 95%/900s=high (matches Enterprise priority mapping)",
+    "Frontend: landing → login → dashboard KPIs render (Total Devices, Online, Offline, Warning, Critical)",
+    "Frontend: Devices page renders list with test-dev; Enroll dialog opens with Label input and Generate code button",
+    "Frontend: Alerts page renders (empty state)",
+    "Frontend: /app/software renders 'Software Policy & Compliance' with Blocklist Mode banner and tabs (Overview, Inventory, Approved, Blocked, Policy)",
+    "WebSocket dashboard: 'Live: connected' indicator visible in sidebar footer after login"
+  ],
+  "failed": [
+    {"area": "docs/routes", "issue": "Review request mentions PUT /api/alerts/{id}/ack and /close but actual routes are POST (routes exist and are functional)", "evidence": "grep in /app/backend/app/routers/alerts.py: @router.post('/{alert_id}/ack'), @router.post('/{alert_id}/close')", "priority": "LOW"}
+  ],
+  "not_tested_runtime": [
+    "Alert engine dwell suppression (short burst below dwell -> no alert)",
+    "Alert engine dedup (occurrence_count increment on same (device_id, rule_key))",
+    "Alert lifecycle ack/close and timeline persistence at runtime",
+    "Critical severity clearing -> resolved_awaiting_ack transition; low auto-resolve after grace",
+    "Reason: requires WebSocket agent (/api/ws/agent) simulation to push telemetry over time; endpoints and config verified but not exercised end-to-end. Recommend full testing agent to run WS agent-based scenarios."
+  ],
+  "action_items": [
+    "Optional: align docs/plan.md to use POST (not PUT) for alerts /ack and /close",
+    "Full testing agent should simulate WS agent telemetry to validate dwell/dedup/ack/close/auto-resolve"
+  ],
+  "success_rate": {"backend": "100% of 14 endpoints smoke-tested passed", "frontend": "100% of 4 pages + WS indicator passed"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}

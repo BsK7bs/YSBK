@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "backend_url": "http://localhost:8001",
+  "ws_url": "ws://localhost:8001/api/ws/agent",
+  "log_level": "INFO",
+  "telemetry_interval": 15,
+  "heartbeat_interval": 30,
+  "inventory_interval": 3600,
+  "diagnostics_interval": 300,
+  "watchdog_max_silence": 120,
+  "watchdog_kill_after": 300
+}

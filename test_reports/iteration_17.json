@@ -1,0 +1,49 @@
+{
+  "summary": "Completed comprehensive backend testing for DPAPI Credential Bootstrap fix. All 15 tests passed (100% success rate). Verified: (1) Regression tests - download-init and download endpoints still work correctly with proper ZIP bundle structure; (2) NEW backend endpoints - POST /api/agent/pair now returns device_api_key field starting with 'dtk_', GET /api/agent/device/{id}/status works as public endpoint returning device status; (3) NEW install.cmd content - contains DPAPI CREDENTIAL BOOTSTRAP section, PowerShell bridge that POSTs to /api/agent/pair, reads device_api_key, uses CredWriteW P/Invoke to write to Windows Credential Manager with target='DigitalTwin/AgentCredentials' and Persist=2 (LocalMachine), invokes installer with --no-pair --silent flags, and has proper fallback branch if PS bridge fails.",
+  
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  
+  "passed_tests": [
+    "Login with admin@digitaltwin.com",
+    "REGRESSION: POST /api/agent/installer/download-init returns download_token, pairing_code (DT-XXXX-XXXX format), filename (.zip), is_bundle=true, expires_in=300",
+    "REGRESSION: GET /api/agent/installer/download?token=<jwt> returns HTTP 200, Content-Type=application/zip, Content-Length matches actual bytes (220MB)",
+    "REGRESSION: ZIP integrity clean (unzip -t passed), layout correct (install.cmd + README.txt + bundle.json at root, 3 EXEs under payload/)",
+    "NEW: POST /api/agent/pair response includes device_api_key field (starts with 'dtk_'), all previous fields (device_id, access_token, refresh_token, org_id, ws_url, api_url, heartbeat_interval_sec, telemetry_interval_sec, policy) still present",
+    "NEW: GET /api/agent/device/{device_id}/status (public, no auth) returns HTTP 200 with {id, hostname, display_name, online=false, last_seen, agent_version, enrolled_at, status='offline'} immediately after pairing",
+    "NEW: GET /api/agent/device/UNKNOWN_ID/status returns HTTP 404 with detail='Device not paired yet'",
+    "NEW: install.cmd contains 'DPAPI CREDENTIAL BOOTSTRAP' section header",
+    "NEW: install.cmd writes PowerShell script to %TEMP% via __PS_BRIDGE variable with DT_BACKEND_URL and DT_PAIR_CODE environment variables",
+    "NEW: PowerShell bridge POSTs to /api/agent/pair and reads device_api_key from response",
+    "NEW: PowerShell bridge has Add-Type block with CredWriteW DllImport in advapi32.dll",
+    "NEW: PowerShell bridge target name is 'DigitalTwin/AgentCredentials', UserName='digitaltwin-agent', Persist=2 (LocalMachine)",
+    "NEW: install.cmd invokes installer with --no-pair and --silent flags in the same call",
+    "NEW: install.cmd has fallback branch (if BRIDGE_RC neq 0) that runs installer without --no-pair if PS bridge fails"
+  ],
+  
+  "test_report_links": [
+    "/app/backend/backend_test_dpapi_fix.py"
+  ],
+  
+  "success_percentage": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "N/A (backend-only testing as requested)"
+  },
+  
+  "updated_files": [
+    "/app/backend/backend_test_dpapi_fix.py"
+  ],
+  
+  "action_item_for_main_agent": "",
+  
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

@@ -1,0 +1,74 @@
+{
+  "summary": "Backend-only verification of the Download Agent flow fix for the 'downloading half' bug. The root cause was: server used chunked transfer encoding without accurate Content-Length, and frontend buffered the whole 200MB response into a JS Blob with React re-renders on every chunk. Fix implemented: server now materializes ZIP to /tmp/dt-installer-cache/<code>.zip and serves via FileResponse (accurate Content-Length + HTTP Range support), and new /download-init endpoint mints short-lived signed JWT for native browser downloads via ?token=<jwt> (no JS-side buffering). All 13 backend tests passed with 100% success rate.",
+  
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  
+  "passed_tests": [
+    "Dist files verification: All 3 files present (DigitalTwinAgentSetup.exe=45MB, agent.exe=150MB, uninstaller.exe=15MB, total=210MB)",
+    "POST /api/auth/login with admin@digitaltwin.com -> 200 with valid access_token",
+    "GET /api/agent/installer/info -> 200 with available=true, bundle=true, filename='DigitalTwinAgentSetup.exe', bundle_contents=['DigitalTwinAgentSetup.exe', 'agent.exe', 'uninstaller.exe'], download_extension='zip', bundle_size=220200960 bytes (>200MB)",
+    "POST /api/agent/installer/download-init (no auth) -> 401 Unauthorized",
+    "POST /api/agent/installer/download-init (with Bearer token) -> 200 with download_token (valid JWT type='installer_download'), pairing_code (format DT-XXXX-XXXX), filename ending in .zip, is_bundle=true, expires_in=300",
+    "GET /api/agent/installer/download (no auth, no token) -> 401 Unauthorized",
+    "GET /api/agent/installer/download?token=<stale/tampered> -> 401 Unauthorized",
+    "GET /api/agent/installer/download?token=<valid-jwt> -> 200 with Content-Type='application/zip', Content-Length=220203937 bytes EXACTLY matches actual bytes received (THIS WAS THE CRITICAL BUG FIX), Content-Disposition contains filename with pairing code, X-Pairing-Code header matches pairing code, X-Bundle-Mode='zip-file'",
+    "ZIP integrity test: unzip -t reports 'No errors detected'",
+    "ZIP contents verification: Contains exactly 6 entries (install.cmd, bundle.json, README.txt, DigitalTwinAgentSetup_<code>.exe ~45MB, agent.exe ~150MB, uninstaller.exe ~15MB)",
+    "ZIP file size on disk matches Content-Length header (210MB)",
+    "GET /api/agent/installer/download (Bearer token, no ?token=) -> 200 with valid ZIP (backwards compatibility confirmed)",
+    "GET /api/agent/installer/verify?code=<pairing_code> -> 200 with code matching, paired=false, device=null, expires_at in future (~10 minutes)"
+  ],
+  
+  "test_report_links": [
+    "/app/backend/backend_test_installer.py"
+  ],
+  
+  "action_items": [],
+  
+  "updated_files": [
+    "/app/backend/backend_test_installer.py"
+  ],
+  
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "Not tested (backend-only testing as per review request)"
+  },
+  
+  "test_credentials": "admin@digitaltwin.com / ChangeMe!2026 (seeded owner account with role >= technician)",
+  
+  "critical_findings": [
+    "✅ CONFIRMED FIX: Content-Length header (220203937 bytes) EXACTLY matches actual bytes received. This confirms the 'downloading half' bug is fixed.",
+    "✅ ZIP materialization to /tmp/dt-installer-cache/<code>.zip is working correctly",
+    "✅ FileResponse serves with accurate Content-Length and supports HTTP Range requests",
+    "✅ New /download-init endpoint correctly mints short-lived JWT (expires_in=300s) with type='installer_download'",
+    "✅ Native browser download flow via ?token=<jwt> works without requiring Authorization header",
+    "✅ Backwards compatibility maintained: GET /download with Bearer token (no ?token=) still works",
+    "✅ ZIP integrity verified: unzip -t passes, all 6 entries present with correct sizes",
+    "✅ Pairing code consistency: code in JWT matches code in filename matches code in X-Pairing-Code header matches code recognized by /verify endpoint"
+  ],
+  
+  "test_environment": {
+    "backend_url": "http://localhost:8001/api (internal backend)",
+    "dist_files_location": "/app/dist/",
+    "dist_files_sizes": {
+      "DigitalTwinAgentSetup.exe": "45 MB",
+      "agent.exe": "150 MB", 
+      "uninstaller.exe": "15 MB",
+      "total": "210 MB"
+    },
+    "cache_directory": "/tmp/dt-installer-cache/",
+    "testing_approach": "Direct HTTP requests to internal backend using httpx client"
+  },
+  
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

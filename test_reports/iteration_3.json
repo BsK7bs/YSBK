@@ -1,0 +1,36 @@
+{
+  "summary": "Tested Top-at-Risk widget + GET /api/predictions/fleet/top-risk + URL-driven Device Detail tabs. All backend (8/8 pytest) and frontend (widget + filter chips + recompute + view-all + row deep-link + URL-driven tab switching + default overview) checks passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/predictions/fleet/top-risk?failure_type=<unknown>", "issue": "Returns HTTP 200 with {error: 'unknown failure_type'} instead of 400/422. Review spec says 400/error — currently only the 'error' half is honored. Consider raising HTTPException(400) for proper REST semantics."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fleet_top_risk.py",
+    "/app/test_reports/pytest/fleet_top_risk_results.xml"
+  ],
+  "action_items": [
+    "Optional: harden GET /predictions/fleet/top-risk to return HTTP 400 (not 200 + error body) for unknown failure_type."
+  ],
+  "critical_code_review_comments": [
+    "predictions_fleet.py: unknown failure_type returns 200 with error payload — inconsistent with the single-device endpoint that returns 400. Prefer HTTPException(400).",
+    "predictions_fleet.py: `cursor.to_list(2000)` caps at 2000 devices without pagination or fallback logging; fine for now but noted for scale.",
+    "DeviceDetailPage.jsx: setActiveTab replaces the URL (replace: true) which prevents back-navigation between tabs — likely intentional but worth confirming with UX."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fleet_top_risk.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@digitaltwin.com / ChangeMe!2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created two pytest-scoped test devices (fleet-failing with injected failing metrics, fleet-nominal) plus one FleetTestOrg tenant for cross-org isolation test. Existing seeded failing device 722cc76b... continues to be top-ranked as expected.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Widget + fleet endpoint + URL-driven tabs all pass. Injected failing device (722cc76b...) consistently ranks first with 100% probability. If retesting URL-driven tabs, remember setSearchParams uses replace:true (no history entry per tab change).",
+  "rca of the issue": "n/a — no defects found"
+}
