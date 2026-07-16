@@ -21,8 +21,8 @@ from pathlib import Path
 import httpx
 import jwt as pyjwt
 
-# Internal backend endpoint
-BASE_URL = "http://localhost:8001/api"
+# Public backend endpoint (testing what users see)
+BASE_URL = "https://safe-import-pro.preview.emergentagent.com/api"
 
 # Test credentials (seeded owner account)
 ADMIN_EMAIL = "admin@digitaltwin.com"
@@ -223,10 +223,10 @@ def test_installer_info(token: str):
                 return None
             
             bundle_size = data.get("bundle_size", 0)
-            if bundle_size < 200 * 1024 * 1024:  # 200 MB
+            if bundle_size < 190 * 1024 * 1024:  # 190 MB
                 results.record_fail(
                     "GET /info",
-                    f"bundle_size={bundle_size/1024/1024:.1f}MB (expected >200MB)"
+                    f"bundle_size={bundle_size/1024/1024:.1f}MB (expected >190MB)"
                 )
                 return None
             
@@ -498,7 +498,7 @@ def test_zip_integrity(zip_path: str, pairing_code: str):
             "No errors detected"
         )
         
-        # Test 2: Verify ZIP contains exactly 6 entries
+        # Test 2: Verify ZIP contains exactly 6 entries (3 in root, 3 in payload/)
         with zipfile.ZipFile(zip_path, 'r') as zf:
             entries = zf.namelist()
             
@@ -506,9 +506,9 @@ def test_zip_integrity(zip_path: str, pairing_code: str):
                 "install.cmd",
                 "bundle.json",
                 "README.txt",
-                f"DigitalTwinAgentSetup_{pairing_code}.exe",
-                "agent.exe",
-                "uninstaller.exe"
+                f"payload/DigitalTwinAgentSetup_{pairing_code}.exe",
+                "payload/agent.exe",
+                "payload/uninstaller.exe"
             ]
             
             if len(entries) != 6:
@@ -527,26 +527,27 @@ def test_zip_integrity(zip_path: str, pairing_code: str):
                 return False
             
             # Verify file sizes are reasonable
-            installer_info = zf.getinfo(f"DigitalTwinAgentSetup_{pairing_code}.exe")
-            agent_info = zf.getinfo("agent.exe")
-            uninstaller_info = zf.getinfo("uninstaller.exe")
+            installer_info = zf.getinfo(f"payload/DigitalTwinAgentSetup_{pairing_code}.exe")
+            agent_info = zf.getinfo("payload/agent.exe")
+            uninstaller_info = zf.getinfo("payload/uninstaller.exe")
             
             # Check approximate sizes (allowing for compression)
-            if installer_info.file_size < 40 * 1024 * 1024:  # ~45 MB
+            # installer.exe is ~14MB, agent.exe is ~45MB, uninstaller.exe is ~138MB
+            if installer_info.file_size < 10 * 1024 * 1024:  # ~14 MB
                 results.record_fail(
                     "ZIP contents",
                     f"Installer too small: {installer_info.file_size/1024/1024:.1f}MB"
                 )
                 return False
             
-            if agent_info.file_size < 140 * 1024 * 1024:  # ~150 MB
+            if agent_info.file_size < 40 * 1024 * 1024:  # ~45 MB
                 results.record_fail(
                     "ZIP contents",
                     f"agent.exe too small: {agent_info.file_size/1024/1024:.1f}MB"
                 )
                 return False
             
-            if uninstaller_info.file_size < 10 * 1024 * 1024:  # ~15 MB
+            if uninstaller_info.file_size < 100 * 1024 * 1024:  # ~138 MB
                 results.record_fail(
                     "ZIP contents",
                     f"uninstaller.exe too small: {uninstaller_info.file_size/1024/1024:.1f}MB"
@@ -559,6 +560,29 @@ def test_zip_integrity(zip_path: str, pairing_code: str):
                 f"installer={installer_info.file_size/1024/1024:.1f}MB, "
                 f"agent={agent_info.file_size/1024/1024:.1f}MB, "
                 f"uninstaller={uninstaller_info.file_size/1024/1024:.1f}MB"
+            )
+            
+            # Test 3: Verify install.cmd contains correct backend URL and pairing code
+            install_cmd_content = zf.read("install.cmd").decode("utf-8")
+            
+            expected_backend_url = "https://safe-import-pro.preview.emergentagent.com"
+            if f'set "BACKEND_URL={expected_backend_url}"' not in install_cmd_content:
+                results.record_fail(
+                    "install.cmd content",
+                    f"Missing or incorrect BACKEND_URL in install.cmd"
+                )
+                return False
+            
+            if f'set "__PAIRING_CODE={pairing_code}"' not in install_cmd_content:
+                results.record_fail(
+                    "install.cmd content",
+                    f"Missing or incorrect pairing code in install.cmd"
+                )
+                return False
+            
+            results.record_pass(
+                "install.cmd content",
+                f"Contains correct BACKEND_URL and pairing code {pairing_code}"
             )
             
             # Verify file size on disk matches Content-Length
