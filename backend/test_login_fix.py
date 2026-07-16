@@ -132,7 +132,7 @@ async def test_login_with_wrong_password(client: httpx.AsyncClient):
                     results.record_pass("Error message is 'Invalid credentials'")
                 else:
                     results.record_fail("Error message", f"Expected 'Invalid credentials', got {data.get('detail')}")
-            except:
+            except Exception:
                 results.record_fail("Error response format", "Could not parse JSON response")
         else:
             results.record_fail(
